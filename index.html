@@ -1,0 +1,215 @@
+<html>
+    <head>
+	<script src="http://d3js.org/d3.v2.js"></script>
+        <style>
+            text {
+                font: 14px sans-serif;
+            }
+
+            .axis {
+                font: 12px sans-serif;
+            }
+
+            .axis path,
+            .axis line {
+                fill: none;
+                stroke: #000;
+                shape-rendering: crispEdges;
+            }
+
+            .axisslider {
+                font: 12px sans-serif;
+            }
+            .axisslider path,
+            .axisslider line {
+                fill: none;
+                stroke: #ddd;
+                shape-rendering: crispEdges;
+            }
+            .axisslider .halo {
+                fill: none;
+                stroke: #ddd;
+                stroke-width: 5px;
+                stroke-linecap: round;
+            }
+
+            .line {
+                fill: none;
+                stroke: #444;
+                stroke-width: 1.5px;
+            }
+
+            .slider .handle {
+                fill: #B8B8B8;
+                stroke: #000;
+                stroke-opacity: 0.5;
+                stroke-width: 1.25px;
+                cursor: col-resize;
+            }
+
+	</style>
+    </head>
+    <body>
+        <div id="graph"></div>
+        <div id="legend"></div> 
+        <script>
+            var margin = {top: 20, right: 20, bottom: 30, left: 40},
+            height = 500 - margin.top - margin.bottom;
+
+            var xScale = d3.scale.linear().range([0, height]), 
+                xAxis = d3.svg.axis().scale(xScale).orient("bottom").ticks(1);
+
+            var yScale = d3.scale.linear().range([height, 0]),
+                yAxis = d3.svg.axis().scale(yScale).orient("left").ticks(1);
+
+            // add the graph canvas 
+            var svg = d3.select("#graph").append("svg")
+                .attr("width", height + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+            // Create Dots
+            var nDots = 100; // number of dots
+            var dataset = d3.range(nDots);
+            svg.selectAll(".dot")
+                .data(dataset)
+                .enter()
+                .append("circle")
+                .attr("class", "dot")  
+                .attr("cx", function() {
+                    return xScale(Math.random()); 
+                })
+                .attr("cy", function() {
+                    return yScale(Math.random());
+                })
+                .attr("r", 8)
+                .style("fill", "blue")
+                .style("stroke", "none")
+                .attr("fill-opacity", 0.1);
+
+            // Add axes
+            svg.append("g")
+                .attr("class", "x axis")
+                .attr("transform", "translate(0," + height +")")
+                .call(xAxis);
+
+            svg.append("g")
+                .attr("class", "y axis")
+                .call(yAxis);
+
+            // Add line
+            svg.append("line")
+                .attr("class", "line")
+                .style("stroke", "gray")
+                .attr("x1", xScale(0))
+                .attr("y1", yScale(0))
+                .attr("x2", xScale(0))
+                .attr("y2", yScale(1));
+
+            // Add legend
+            var svg2 = d3.select("#legend").append("svg")
+                .attr("width", 960 + margin.left + margin.right)
+                .attr("height", 120 + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", "translate(" + margin.left + "," +  margin.top + ")");
+
+            svg2.append("circle") 
+                .attr("cx", 0)
+                .attr("cy", 0)
+                .attr("r", 8)
+                .style("fill", "blue")
+                .style("stroke", "none")
+                .attr("fill-opacity", 0.1);
+
+            svg2.append("circle")
+                .attr("cx", 0)
+                .attr("cy", 20)
+                .attr("r", 8)
+                .style("fill", "none")
+                .style("stroke", "gray");
+
+            svg2.append("text").attr("id", "bDot")
+                .attr("x", 15)
+                .attr("dy", ".35em")
+                .text(nDots);
+
+            svg2.append("text").attr("id", "wDot")
+                .attr("x", 15)
+                .attr("y", 21)
+                .attr("dy", ".35em")
+                .text(0);
+
+            // Add slider in legend
+            var sliderLength = 100;
+            var sliderX = 200; // slider x coordinate
+            var sliderScale = d3.scale.linear().range([0, sliderLength]).clamp(true);
+
+            var brush = d3.svg.brush()
+                .x(sliderScale)
+                .on("brush", brushed);
+
+            svg2.append("g")
+                .attr("class", "x axisslider")
+                .attr("transform", "translate(" + sliderX + ",0)")
+                .call(d3.svg.axis()
+                .scale(sliderScale)
+                .orient("bottom")
+                .ticks(5)
+                .tickSize(8, 0)
+                .tickFormat(function(d,i){ if (i == 0) return 0; else if (i == 5) return 1;} ))
+                .select(".domain")
+                .select(function() { return this.parentNode.appendChild(this.cloneNode(true)); })
+                .attr("class", "halo");
+        
+            svg2.selectAll(".tick")
+                .each(function (d, i) {
+                    if ( i == 0 || i == 5) {
+                        this.remove();
+                    }
+                });
+
+            var slider = svg2.append("g")
+                .attr("class", "slider")
+                .call(brush);
+
+            var handle = slider.append("circle")
+                .attr("class", "handle")
+                .attr("transform", "translate(" + sliderX + ",0)")
+                .attr("r", 5);
+
+            function brushed() {
+                var value = brush.extent()[0];
+
+                if (d3.event.sourceEvent) {
+                    value = sliderScale.invert(d3.mouse(this)[0] - sliderX);
+                    brush.extent([value, value]);
+                }
+
+                handle.attr("cx", sliderScale(value));
+    
+                // Color dots left of line in white and dots right of line in blue
+                // Also count dots and print counts
+                var count; // number of white dots
+                d3.selectAll(".dot")
+                    .filter(function(){ return d3.select(this).attr("cx") <= xScale(value); })
+                    .call(function(){ count = this[0].length; })
+                    .style("fill", "white")
+                    .style("stroke", "gray");
+                d3.selectAll(".dot")
+                    .filter(function(){ return d3.select(this).attr("cx") > xScale(value); })
+                    .style("fill", "blue")
+                    .style("stroke", "none")
+                    .style("fill-opacity", 0.1);
+                // Translate line using slider value
+                svg.select(".line")
+                    .attr("transform", "translate(" + xScale(value) + ",0)");
+                // Print legend with number of white and blue dots
+                d3.select("#wDot")
+                    .text(count);
+                d3.select("#bDot")
+                    .text(nDots - count);
+            }
+        </script>
+    </body>
+</html>
